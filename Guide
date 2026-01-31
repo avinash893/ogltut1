@@ -1,0 +1,222 @@
+OPENGL + GLFW + GLAD SETUP (WINDOWS / VISUAL STUDIO)
+===================================================
+
+AUTHOR NOTE
+-----------
+This document describes the complete process of setting up OpenGL using
+GLFW and GLAD in Visual Studio (C++), including common mistakes, linker
+errors, and their fixes. It also explains how the libraries were placed
+INSIDE the project for portability and sharing.
+
+---------------------------------------------------
+1. INITIAL STATE
+---------------------------------------------------
+
+- Visual Studio Community installed
+- No OpenGL-related libraries installed
+- Goal: Create an OpenGL window using GLFW + GLAD
+- Language: C++
+- Platform: Windows (x64)
+
+Important note:
+OpenGL itself DOES NOT create windows. A windowing library (GLFW) and
+a function loader (GLAD) are required.
+
+---------------------------------------------------
+2. COMMON INITIAL MISTAKES
+---------------------------------------------------
+
+PROBLEM 1: Created a C# (.NET) project by mistake
+-------------------------------------------------
+Symptoms:
+- Program.cs instead of main.cpp
+- No "C/C++" or "Linker" settings in Project Properties
+- No option for Additional Include Directories
+
+SOLUTION:
+- Create a NEW project
+- Select "Console App" with language = C++
+- NOT ".NET", NOT C#
+
+---------------------------------------------------
+3. DECISION: KEEP LIBRARIES INSIDE PROJECT
+---------------------------------------------------
+
+Reason:
+- Easier to share the project (zip & send)
+- No absolute paths like C:\Libraries\...
+- Works on any PC with Visual Studio
+
+We decided to keep all third-party libraries inside a folder named "libs"
+inside the project directory.
+
+---------------------------------------------------
+4. FINAL PROJECT STRUCTURE
+---------------------------------------------------
+
+<ProjectRoot>/
+│
+├── ProjectName.sln
+└── ProjectName/
+    ├── main.cpp
+    ├── glad.c
+    └── libs/
+        ├── glfw/
+        │   ├── include/
+        │   └── lib-vc2022/
+        └── glad/
+            ├── include/
+            └── src/
+
+---------------------------------------------------
+5. COMMANDS TO CREATE FOLDER STRUCTURE (CMD / WSL)
+---------------------------------------------------
+
+NOTE:
+Replace <PROJECT_FOLDER> with your own project path.
+
+Example:
+cd <PROJECT_FOLDER>
+
+Commands:
+
+mkdir libs
+mkdir libs\glfw
+mkdir libs\glad
+
+(WSL / Git Bash version)
+
+mkdir -p libs/glfw libs/glad
+
+---------------------------------------------------
+6. COPYING LIBRARY FILES
+---------------------------------------------------
+
+GLFW:
+- Download GLFW (64-bit, Visual Studio build)
+- Copy ONLY these into libs/glfw:
+  - include/
+  - lib-vc2022/
+
+GLAD:
+- Generate GLAD from https://glad.dav1d.de/
+  Settings:
+    Language: C/C++
+    Specification: OpenGL
+    API: 3.3
+    Profile: Core
+- Copy:
+  - include/  → libs/glad/include
+  - src/      → libs/glad/src
+
+IMPORTANT:
+- glad.c MUST be added to the Visual Studio project
+  (Source Files → Add → Existing Item → glad.c)
+
+---------------------------------------------------
+7. VISUAL STUDIO PROJECT SETTINGS
+---------------------------------------------------
+
+Platform:
+- x64
+- Configuration: All Configurations
+
+INCLUDE DIRECTORIES
+C/C++ → General → Additional Include Directories
+
+Add (RELATIVE PATHS):
+
+$(ProjectDir)libs/glfw/include
+$(ProjectDir)libs/glad/include
+
+LIBRARY DIRECTORY
+Linker → General → Additional Library Directories
+
+Add:
+
+$(ProjectDir)libs/glfw/lib-vc2022
+
+LINKED LIBRARIES
+Linker → Input → Additional Dependencies
+
+Add:
+
+glfw3.lib
+opengl32.lib
+
+---------------------------------------------------
+8. LINKER ERROR ENCOUNTERED
+---------------------------------------------------
+
+ERROR:
+LNK2001 / LNK1120
+"unresolved external symbol __imp_CreateWindowExW"
+and many similar Win32 symbols.
+
+Cause:
+GLFW internally uses Windows system APIs, but the required
+Windows system libraries were NOT linked.
+
+---------------------------------------------------
+9. LINKER ERROR FIX (CRITICAL STEP)
+---------------------------------------------------
+
+Add the following to:
+
+Linker → Input → Additional Dependencies
+
+user32.lib
+gdi32.lib
+shell32.lib
+kernel32.lib
+winmm.lib
+
+After adding:
+- Rebuild Solution (not just Build)
+
+---------------------------------------------------
+10. MINIMAL WORKING TEST CODE
+---------------------------------------------------
+
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+int main()
+{
+    glfwInit();
+
+    GLFWwindow* window =
+        glfwCreateWindow(800, 600, "OpenGL Test", nullptr, nullptr);
+
+    glfwMakeContextCurrent(window);
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+    while (!glfwWindowShouldClose(window))
+    {
+        glClear(GL_COLOR_BUFFER_BIT);
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwTerminate();
+    return 0;
+}
+
+Expected result:
+- Black window opens
+- No linker errors
+- OpenGL context successfully created
+
+---------------------------------------------------
+11. FINAL OUTCOME
+---------------------------------------------------
+
+- OpenGL successfully initialized
+- GLFW window created
+- GLAD loaded modern OpenGL functions
+- Project is fully portable and shareable
+- Libraries are inside project (no absolute paths)
+
+---------------------------------------------------
+END OF DOCUMENT
+===================================================
