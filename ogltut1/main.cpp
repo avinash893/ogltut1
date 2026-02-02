@@ -1,134 +1,156 @@
-#include<glad/glad.h>
-#include<GLFW/glfw3.h>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
 
-#include<iostream>
-#include<fstream>
-
-//initialize window
+#include <iostream>
+#include "texture.h"
 
 int main()
 {
-	if (!glfwInit())
-	{
-		std::cout << "failed to initialize GLFW" << std::endl;
-	}
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    // ---------------- GLFW ----------------
+    if (!glfwInit())
+    {
+        std::cout << "Failed to init GLFW\n";
+        return -1;
+    }
 
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL Window", nullptr, nullptr);
+    GLFWwindow* window =
+        glfwCreateWindow(800, 600, "Textured Quad", nullptr, nullptr);
 
-	if (window==nullptr)
-	{
-		std::cout << "failed to create GLFW window" << std::endl;
-		glfwTerminate();
-		return -1;
+    if (!window)
+    {
+        std::cout << "Failed to create window\n";
+        glfwTerminate();
+        return -1;
+    }
 
-	}
-	
-	float vertices[] =
-	{ //vertex positions	//vertex colors
-		-0.5f,-0.5f,0.0f, 1.0f,0.0f,0.0f,	 //bottom left
-		 0.5f,-0.5f,0.0f, 0.0f,1.0f,0.0f,	//bottom right
-		 0.0f, 0.5f,0.0f, 0.0f,0.0f,1.0f	//top
-	};
+    glfwMakeContextCurrent(window);
 
-		const char* vertexShaderSource = R"(
-			#version 330 core
-			layout (location = 0) in vec3 aPos;
-			layout (location = 1) in vec3 aColor;
+    // ---------------- GLAD ----------------
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+    {
+        std::cout << "Failed to init GLAD\n";
+        return -1;
+    }
 
-			out vec3 ourColor;
+    // ---------------- Geometry ----------------
+    float vertices[] = {
+        // positions        // tex coords
+        -0.5f,-0.5f,0.0f,   0.0f,0.0f,
+         0.5f,-0.5f,0.0f,   1.0f,0.0f,
+         0.5f, 0.5f,0.0f,   1.0f,1.0f,
+        -0.5f, 0.5f,0.0f,   0.0f,1.0f
+    };
 
-			void main()
-			{
-				gl_Position = vec4(aPos, 1.0);
-				ourColor = aColor;
-			}
+    unsigned int indices[] = {
+        0,1,2,
+        0,2,3
+    };
 
+    unsigned int VAO, VBO, EBO;
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+    glGenBuffers(1, &EBO);
 
-			)";
+    glBindVertexArray(VAO);
 
-		const char* fragmentShaderSource = R"(
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-			#version 330 core
-			in vec3 ourColor;
-			out vec4 FragColor;
-			void main()
-			{
-					FragColor = vec4(ourColor, 1.0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
-			}
+    // position
+    glVertexAttribPointer(
+        0, 3, GL_FLOAT, GL_FALSE,
+        5 * sizeof(float),
+        (void*)0
+    );
+    glEnableVertexAttribArray(0);
 
-)";
-	glfwMakeContextCurrent(window);
+    // tex coords
+    glVertexAttribPointer(
+        1, 2, GL_FLOAT, GL_FALSE,
+        5 * sizeof(float),
+        (void*)(3 * sizeof(float))
+    );
+    glEnableVertexAttribArray(1);
 
-	if(gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)==0)
-	{
-		std::cout << "failed to initialize GLAD" << std::endl;
-		return -1;
-	}
-		unsigned int VAO, VBO;
-		glGenBuffers(1, &VBO);
-		glGenVertexArrays(1, &VAO);
-		glBindVertexArray(VAO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),vertices,GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // ---------------- Shaders ----------------
+    const char* vertexShaderSrc = R"(
+        #version 330 core
+        layout (location = 0) in vec3 aPos;
+        layout (location = 1) in vec2 aTexCoord;
 
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+        out vec2 TexCoord;
 
-		glEnableVertexAttribArray(1);
+        void main()
+        {
+            gl_Position = vec4(aPos, 1.0);
+            TexCoord = aTexCoord;
+        }
+    )";
 
+    const char* fragmentShaderSrc = R"(
+        #version 330 core
+        in vec2 TexCoord;
+        out vec4 FragColor;
 
-		unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vertexShader, 1, &vertexShaderSource,NULL);
+        uniform sampler2D texture1;
 
-		glCompileShader(vertexShader);
+        void main()
+        {
+            FragColor = texture(texture1, TexCoord);
+        }
+    )";
 
-		unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    unsigned int vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &vertexShaderSrc, nullptr);
+    glCompileShader(vs);
 
-		glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    unsigned int fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &fragmentShaderSrc, nullptr);
+    glCompileShader(fs);
 
-		glCompileShader(fragmentShader);
+    unsigned int shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vs);
+    glAttachShader(shaderProgram, fs);
+    glLinkProgram(shaderProgram);
 
+    glDeleteShader(vs);
+    glDeleteShader(fs);
 
-		unsigned int shaderProgram = glCreateProgram();
-		glAttachShader(shaderProgram, vertexShader);
-		glAttachShader(shaderProgram, fragmentShader);
-		glLinkProgram(shaderProgram);
-		
+    // ---------------- Texture (AFTER GLAD) ----------------
+    Texture cat("assets/textures/cat.png");
 
-		glDeleteShader(vertexShader);
-		glDeleteShader(fragmentShader);
+    glUseProgram(shaderProgram);
+    glUniform1i(
+        glGetUniformLocation(shaderProgram, "texture1"),
+        0
+    );
 
+    // ---------------- Render Loop ----------------
+    while (!glfwWindowShouldClose(window))
+    {
+        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, true);
 
+        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-	while (glfwWindowShouldClose(window) == false)
-	{
-		if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-		{
-			glfwSetWindowShouldClose(window, true);
-		}
+        glUseProgram(shaderProgram);
+        cat.Bind(0);
 
-		glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-		glUseProgram(shaderProgram);
-		glBindVertexArray(VAO);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		glfwSwapBuffers(window);
-		glfwPollEvents();
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
 
-	}
-
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-
-	glfwTerminate();
-	return 0;
-
-
+    glfwTerminate();
+    return 0;
 }
